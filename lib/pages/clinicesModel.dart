@@ -1,3 +1,4 @@
+
 class ClinicesModel {
   String? code;
   String? message;
@@ -70,3 +71,4 @@ class Clinics {
     return data;
   }
 }
+

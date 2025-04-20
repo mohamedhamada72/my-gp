@@ -980,7 +980,7 @@ class DermatologyClinicMapScreen extends StatefulWidget {
   final List<Clinics> Clinices;
   final ClinicesModel? clinicsData;
 
-  DermatologyClinicMapScreen({Key? key, required this.Clinices, this.clinicsData}) : super(key: key);
+  DermatologyClinicMapScreen({Key? key, required this.Clinices, this.clinicsData, }) : super(key: key);
 
   @override
   State<DermatologyClinicMapScreen> createState() => _DermatologyClinicMapScreenState();

@@ -2217,7 +2217,7 @@ class _Home_screenState extends State<Home_screen> {
   }
 }
 */
-
+/*
 //الكود مفهوش مشكلة بس عابز اضيف ال category
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -2448,5 +2448,923 @@ class _Home_screenState extends State<Home_screen> {
     );
   }
 }
+*/
 
 
+/*
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:scholar_chat/pages/DermatologyClinicMapScreen.dart';
+import 'package:scholar_chat/pages/QuestionsScreen.dart';
+import 'package:scholar_chat/widgets/CalendarWidget.dart';
+import 'AddNoteScreen.dart';
+import 'SettingsScreen.dart'; // استيراد صفحة الإعدادات
+
+class Home_screen extends StatefulWidget {
+  Home_screen({Key? key}) : super(key: key);
+
+  static String id = 'Home_screen';
+
+  @override
+  State<Home_screen> createState() => _Home_screenState();
+}
+
+class _Home_screenState extends State<Home_screen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  User? user;
+  String userName = "User";
+  int _page = 2; // الصفحة الافتراضية هي الزر الأوسط (Add Note)
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentUser();
+  }
+
+  void _getCurrentUser() {
+    user = _auth.currentUser;
+    if (user != null) {
+      setState(() {
+        userName = user!.email ?? "User";
+      });
+    }
+  }
+
+  void deleteNote(String noteId) {
+    _firestore.collection('users').doc(user!.uid).collection('notes').doc(noteId).delete();
+  }
+
+  void editNote(String noteId, String currentText) {
+    TextEditingController textController = TextEditingController(text: currentText);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Edit Note"),
+        content: TextField(
+          controller: textController,
+          decoration: InputDecoration(hintText: "Add New Note"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              _firestore.collection('users').doc(user!.uid).collection('notes').doc(noteId).update({
+                'text': textController.text,
+                'timestamp': FieldValue.serverTimestamp(),
+              });
+              Navigator.pop(context);
+            },
+            child: Text("Save"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future getImageFromCamera() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => QuestionsScreen(action: 'camera')),
+    );
+  }
+
+  Future getImageFromGallery() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => QuestionsScreen(action: 'gallery')),
+    );
+  }
+
+  // ويدجت مخصصة لعرض الفئات
+  Widget _buildCategoryCard(String title, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        margin: EdgeInsets.symmetric(vertical: 8, horizontal: 15),
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Welcome back, $userName'),
+        backgroundColor: Colors.blueGrey,
+      ),
+      body: user == null
+          ? Center(child: CircularProgressIndicator())
+          : StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('users')
+                  .doc(user!.uid)
+                  .collection('notes')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
+                return Column(
+                  children: [
+                    CalendarWidget(),
+                    // إضافة الفئتين هنا
+                    _buildCategoryCard(
+                      "Documents",
+                      Colors.blueAccent,
+                      () {
+                        // وظيفة عند النقر على فئة Documents
+                        print("Documents category tapped");
+                      },
+                    ),
+                    _buildCategoryCard(
+                      "Life Quality",
+                      Colors.greenAccent,
+                      () {
+                        // وظيفة عند النقر على فئة Life Quality
+                        print("Life Quality category tapped");
+                      },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Container(
+                        width: double.infinity,
+                        height: MediaQuery.of(context).size.height * 0.3,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[900],
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: snapshot.data!.docs.map((doc) {
+                              String noteId = doc.id;
+                              String noteText = doc['text'];
+                              Timestamp? timestamp = doc['timestamp'] as Timestamp?; // فحص null
+                              DateTime dateTime = timestamp != null ? timestamp.toDate() : DateTime.now(); // استخدام قيمة افتراضية إذا كان timestamp غير موجود
+                              String formattedDate = "${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute}";
+
+                              return Container(
+                                width: double.infinity,
+                                margin: EdgeInsets.symmetric(vertical: 3, horizontal: 15),
+                                padding: EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.primaries[snapshot.data!.docs.indexOf(doc) % Colors.primaries.length].shade300,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      noteText,
+                                      style: TextStyle(color: Colors.black, fontSize: 20),
+                                    ),
+                                    SizedBox(height: 1),
+                                    Text(
+                                      formattedDate,
+                                      style: TextStyle(color: Colors.black54, fontSize: 14),
+                                    ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(Icons.edit, color: Colors.blue),
+                                          onPressed: () => editNote(noteId, noteText),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(Icons.delete, color: Colors.red),
+                                          onPressed: () => deleteNote(noteId),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+      bottomNavigationBar: CurvedNavigationBar(
+        index: _page,
+        height: 60.0,
+        items: <Widget>[
+          Icon(Icons.camera_alt, size: 30), // زر الكاميرا على اليسار
+          Icon(Icons.photo_library, size: 30), // زر المعرض على اليمين
+          Icon(Icons.add, size: 30), // زر Add Note في المنتصف
+          Icon(Icons.settings, size: 30), // زر الإعدادات
+          Icon(Icons.map, size: 30), // زر الخريطة
+        ],
+        color: Colors.blueGrey,
+        buttonBackgroundColor: Colors.blueGrey,
+        backgroundColor: Colors.transparent,
+        animationCurve: Curves.easeInOut,
+        animationDuration: Duration(milliseconds: 300),
+        onTap: (index) {
+          setState(() {
+            _page = index;
+          });
+
+          switch (index) {
+            case 0:
+              getImageFromCamera(); // زر الكاميرا
+              break;
+            case 1:
+              getImageFromGallery(); // زر المعرض
+              break;
+            case 2:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AddNoteScreen()),
+              ); // زر Add Note
+              break;
+            case 3:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => SettingsScreen()),
+              ); // زر الإعدادات
+              break;
+            case 4:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => DermatologyClinicMapScreen(Clinices: [],)),
+              ); // زر الخريطة
+              break;
+          }
+        },
+      ),
+    );
+  }
+}
+*/
+/*
+
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:scholar_chat/pages/DermatologyClinicMapScreen.dart';
+import 'package:scholar_chat/pages/QuestionsScreen.dart';
+import 'package:scholar_chat/pages/life_quality_screen.dart';
+import 'package:scholar_chat/widgets/CalendarWidget.dart';
+import 'AddNoteScreen.dart';
+import 'SettingsScreen.dart'; // استيراد صفحة الإعدادات
+import 'package:scholar_chat/pages/ReliableInformationScreen.dart'; // استيراد الصفحة الجديدة
+
+class Home_screen extends StatefulWidget {
+  Home_screen({Key? key}) : super(key: key);
+
+  static String id = 'Home_screen';
+
+  @override
+  State<Home_screen> createState() => _Home_screenState();
+}
+
+class _Home_screenState extends State<Home_screen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  User? user;
+  String userName = "User";
+  int _page = 2; // الصفحة الافتراضية هي الزر الأوسط (Add Note)
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentUser();
+  }
+
+  void _getCurrentUser() {
+    user = _auth.currentUser;
+    if (user != null) {
+      setState(() {
+        userName = user!.email ?? "User";
+      });
+    }
+  }
+
+  void deleteNote(String noteId) {
+    _firestore.collection('users').doc(user!.uid).collection('notes').doc(noteId).delete();
+  }
+
+  void editNote(String noteId, String currentText) {
+    TextEditingController textController = TextEditingController(text: currentText);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Edit Note"),
+        content: TextField(
+          controller: textController,
+          decoration: InputDecoration(hintText: "Add New Note"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              _firestore.collection('users').doc(user!.uid).collection('notes').doc(noteId).update({
+                'text': textController.text,
+                'timestamp': FieldValue.serverTimestamp(),
+              });
+              Navigator.pop(context);
+            },
+            child: Text("Save"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future getImageFromCamera() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => QuestionsScreen(action: 'camera')),
+    );
+  }
+
+  Future getImageFromGallery() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => QuestionsScreen(action: 'gallery')),
+    );
+  }
+
+  // ويدجت مخصصة لعرض الفئات
+  Widget _buildCategoryCard(String title, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        margin: EdgeInsets.symmetric(vertical: 8, horizontal: 15),
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Welcome back, $userName'),
+        backgroundColor: Colors.blueGrey,
+      ),
+      body: user == null
+          ? Center(child: CircularProgressIndicator())
+          : StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('users')
+                  .doc(user!.uid)
+                  .collection('notes')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
+                return Column(
+                  children: [
+                    CalendarWidget(),
+                    // إضافة الفئتين هنا
+                    _buildCategoryCard(
+                      "Documents",
+                     Colors.greenAccent,
+                      () {
+                        // التنقل إلى صفحة Reliable Information
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ReliableInformationScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildCategoryCard(
+                      "Life Quality",
+                      Colors.blueAccent,
+                      () {  Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LifeQualityScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Container(
+                        width: double.infinity,
+                        height: MediaQuery.of(context).size.height * 0.3,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[900],
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: snapshot.data!.docs.map((doc) {
+                              String noteId = doc.id;
+                              String noteText = doc['text'];
+                              Timestamp? timestamp = doc['timestamp'] as Timestamp?; // فحص null
+                              DateTime dateTime = timestamp != null ? timestamp.toDate() : DateTime.now(); // استخدام قيمة افتراضية إذا كان timestamp غير موجود
+                              String formattedDate = "${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute}";
+
+                              return Container(
+                                width: double.infinity,
+                                margin: EdgeInsets.symmetric(vertical: 3, horizontal: 15),
+                                padding: EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.primaries[snapshot.data!.docs.indexOf(doc) % Colors.primaries.length].shade300,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      noteText,
+                                      style: TextStyle(color: Colors.black, fontSize: 20),
+                                    ),
+                                    SizedBox(height: 1),
+                                    Text(
+                                      formattedDate,
+                                      style: TextStyle(color: Colors.black54, fontSize: 14),
+                                    ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(Icons.edit, color: Colors.blue),
+                                          onPressed: () => editNote(noteId, noteText),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(Icons.delete, color: Colors.red),
+                                          onPressed: () => deleteNote(noteId),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+      bottomNavigationBar: CurvedNavigationBar(
+        index: _page,
+        height: 60.0,
+        items: <Widget>[
+          Icon(Icons.camera_alt, size: 30), // زر الكاميرا على اليسار
+          Icon(Icons.photo_library, size: 30), // زر المعرض على اليمين
+          Icon(Icons.add, size: 30), // زر Add Note في المنتصف
+          Icon(Icons.settings, size: 30), // زر الإعدادات
+          Icon(Icons.map, size: 30), // زر الخريطة
+        ],
+        color: Colors.blueGrey,
+        buttonBackgroundColor: Colors.blueGrey,
+        backgroundColor: Colors.transparent,
+        animationCurve: Curves.easeInOut,
+        animationDuration: Duration(milliseconds: 300),
+        onTap: (index) {
+          setState(() {
+            _page = index;
+          });
+
+          switch (index) {
+            case 0:
+              getImageFromCamera(); // زر الكاميرا
+              break;
+            case 1:
+              getImageFromGallery(); // زر المعرض
+              break;
+            case 2:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AddNoteScreen()),
+              ); // زر Add Note
+              break;
+            case 3:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => SettingsScreen()),
+              ); // زر الإعدادات
+              break;
+            case 4:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => DermatologyClinicMapScreen(Clinices: [],)),
+              ); // زر الخريطة
+              break;
+          }
+        },
+      ),
+    );
+  }
+}
+*/
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:scholar_chat/pages/DermatologyClinicMapScreen.dart';
+import 'package:scholar_chat/pages/QuestionsScreen.dart';
+import 'package:scholar_chat/pages/life_quality_screen.dart';
+import 'package:scholar_chat/widgets/CalendarWidget.dart';
+import 'AddNoteScreen.dart';
+import 'SettingsScreen.dart';
+import 'package:scholar_chat/pages/ReliableInformationScreen.dart';
+
+class Home_screen extends StatefulWidget {
+  Home_screen({Key? key}) : super(key: key);
+
+  static String id = 'Home_screen';
+
+  @override
+  State<Home_screen> createState() => _Home_screenState();
+}
+
+class _Home_screenState extends State<Home_screen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  User? user;
+  String userName = "User";
+  int _page = 2;
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentUser();
+  }
+
+  void _getCurrentUser() {
+    user = _auth.currentUser;
+    if (user != null) {
+      setState(() {
+        userName = user!.displayName ?? user!.email ?? "User";
+      });
+    }
+  }
+
+  void deleteNote(String noteId) {
+    _firestore.collection('users').doc(user!.uid).collection('notes').doc(noteId).delete();
+  }
+
+  void editNote(String noteId, String currentText) {
+    TextEditingController textController = TextEditingController(text: currentText);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Edit Note"),
+        content: TextField(
+          controller: textController,
+          decoration: InputDecoration(hintText: "Edit your note"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              _firestore.collection('users').doc(user!.uid).collection('notes').doc(noteId).update({
+                'text': textController.text,
+                'timestamp': FieldValue.serverTimestamp(),
+              });
+              Navigator.pop(context);
+            },
+            child: Text("Save"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future getImageFromCamera() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => QuestionsScreen(action: 'camera')),
+    );
+  }
+
+  Future getImageFromGallery() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => QuestionsScreen(action: 'gallery')),
+    );
+  }
+
+  Widget _buildCategoryCard(String title, IconData icon, Color color, VoidCallback onTap) {
+    return Card(
+      elevation: 5,
+      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 15),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: Container(
+          padding: EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 30, color: Colors.white),
+              SizedBox(width: 15),
+              Text(
+                title,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Welcome, $userName'),
+        backgroundColor: Colors.blueGrey,
+        elevation: 0,
+      ),
+      body: user == null
+          ? Center(child: CircularProgressIndicator())
+          : StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('users')
+                  .doc(user!.uid)
+                  .collection('notes')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
+                return SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      CalendarWidget(),
+                      _buildCategoryCard(
+                        "Medical Documents",
+                        Icons.medical_services,
+                        Colors.greenAccent,
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ReliableInformationScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildCategoryCard(
+                        "Life Quality Assessment",
+                        Icons.health_and_safety,
+                        Colors.blueAccent,
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => LifeQualityScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Container(
+                          width: double.infinity,
+                          height: MediaQuery.of(context).size.height * 0.3,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 10,
+                                offset: Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: snapshot.data!.docs.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    "No notes yet",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                )
+                              : SingleChildScrollView(
+                                  child: Column(
+                                    children: snapshot.data!.docs.map((doc) {
+                                      String noteId = doc.id;
+                                      String noteText = doc['text'];
+                                      Timestamp? timestamp = doc['timestamp'];
+                                      DateTime dateTime = timestamp?.toDate() ?? DateTime.now();
+                                      String formattedDate = "${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute}";
+
+                                      return Container(
+                                        width: double.infinity,
+                                        margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                                        padding: EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(10),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black12,
+                                              blurRadius: 3,
+                                              offset: Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              noteText,
+                                              style: TextStyle(
+                                                color: Colors.black,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            SizedBox(height: 5),
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(
+                                                  formattedDate,
+                                                  style: TextStyle(
+                                                    color: Colors.grey,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                Row(
+                                                  children: [
+                                                    IconButton(
+                                                      icon: Icon(Icons.edit, size: 18, color: Colors.blue),
+                                                      onPressed: () => editNote(noteId, noteText),
+                                                    ),
+                                                    IconButton(
+                                                      icon: Icon(Icons.delete, size: 18, color: Colors.red),
+                                                      onPressed: () => deleteNote(noteId),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+      bottomNavigationBar: CurvedNavigationBar(
+        index: _page,
+        height: 60.0,
+        items: <Widget>[
+          Tooltip(
+            message: 'Camera',
+            child: Icon(Icons.camera_alt, size: 30),
+          ),
+          Tooltip(
+            message: 'Gallery',
+            child: Icon(Icons.photo_library, size: 30),
+          ),
+          Tooltip(
+            message: 'Add Note',
+            child: Icon(Icons.add, size: 30),
+          ),
+          Tooltip(
+            message: 'Settings',
+            child: Icon(Icons.settings, size: 30),
+          ),
+          Tooltip(
+            message: 'Clinics Map',
+            child: Icon(Icons.map, size: 30),
+          ),
+        ],
+        color: Colors.blueGrey,
+        buttonBackgroundColor: Colors.blueGrey.shade800,
+        backgroundColor: Colors.transparent,
+        animationCurve: Curves.easeInOut,
+        animationDuration: Duration(milliseconds: 300),
+        onTap: (index) {
+          setState(() {
+            _page = index;
+          });
+
+          switch (index) {
+            case 0:
+              getImageFromCamera();
+              break;
+            case 1:
+              getImageFromGallery();
+              break;
+            case 2:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AddNoteScreen()),
+              );
+              break;
+            case 3:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => SettingsScreen()),
+              );
+              break;
+            case 4:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => DermatologyClinicMapScreen(Clinices: [])),
+              );
+              break;
+          }
+        },
+      ),
+    );
+  }
+}

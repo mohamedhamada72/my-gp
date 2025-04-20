@@ -356,7 +356,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             SizedBox(height: 20),
 
-            _buildSettingButton(isArabic ? 'تعديل الملف الشخصي' : 'Edit Profile', Icons.edit, () {}),
+           
             
             // زر تغيير اللغة
             _buildSettingButton(isArabic ? 'تغيير اللغة' : 'Language', Icons.language, () {
